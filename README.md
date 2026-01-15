@@ -21,10 +21,10 @@ The GitHub Action 'Update Helm App Version' is designed to automatically update 
 
 <!-- AUTO-DOC-INPUT:START - Do not remove or modify this section -->
 
-| INPUT                                                             | TYPE   | REQUIRED | DEFAULT | DESCRIPTION                                                            |
-| ----------------------------------------------------------------- | ------ | -------- | ------- | ---------------------------------------------------------------------- |
-| <a name="input_app_name"></a>[app_name](#input_app_name)          | string | true     |         | The name of the application <br>(e.g., krew-test-app-api)              |
-| <a name="input_environment"></a>[environment](#input_environment) | string | true     |         | The environment to update <br>(e.g., integration-sandbox, integration) |
-| <a name="input_version"></a>[version](#input_version)             | string | true     |         | The new version tag                                                    |
+|                               INPUT                               |  TYPE  | REQUIRED | DEFAULT |                             DESCRIPTION                             |
+|-------------------------------------------------------------------|--------|----------|---------|---------------------------------------------------------------------|
+|     <a name="input_app_name"></a>[app_name](#input_app_name)      | string |   true   |         |     The name of the application <br>(e.g., krew-test-app-api)       |
+| <a name="input_environment"></a>[environment](#input_environment) | string |   true   |         | The environment to update (e.g., integration-sandbox, integration)  |
+|       <a name="input_version"></a>[version](#input_version)       | string |   true   |         |                         The new version tag                         |
 
 <!-- AUTO-DOC-INPUT:END -->
