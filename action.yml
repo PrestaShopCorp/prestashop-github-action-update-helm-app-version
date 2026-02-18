@@ -10,6 +10,10 @@ inputs:
   version:
     description: 'The new version tag'
     required: true
+  token:
+    description: 'GitHub token with push access (e.g. from a GitHub App)'
+    required: false
+    default: ''
 
 runs:
   using: "composite"
@@ -37,9 +41,17 @@ runs:
 
   - name: Commit and Push changes
     shell: bash
+    env:
+      INPUT_TOKEN: ${{ inputs.token }}
     run: |
       git config --global user.name "github-actions[bot]"
       git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      # If a custom token is provided, update the remote URL to use it
+      if [[ -n "$INPUT_TOKEN" ]]; then
+        REPO_URL=$(git remote get-url origin | sed 's|https://.*@|https://|' | sed 's|https://|https://x-access-token:'"$INPUT_TOKEN"'@|')
+        git remote set-url origin "$REPO_URL"
+      fi
 
       FILE_PATH="helm/apps/${{ inputs.app_name }}/values/appversion-${{ inputs.environment }}.values.yaml"
 
