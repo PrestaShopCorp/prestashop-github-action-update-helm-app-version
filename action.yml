@@ -1,5 +1,5 @@
 name: 'Update Helm App Version'
-description: 'Updates the app version in the specified Helm values file and pushes the change.'
+description: 'Updates the app version in the specified Helm values file and creates a PR.'
 inputs:
   app_name:
     description: 'The name of the application (e.g., krew-test-app-api)'
@@ -10,6 +10,15 @@ inputs:
   version:
     description: 'The new version tag'
     required: true
+  base_branch:
+    description: 'Base branch for the PR'
+    required: false
+    default: 'main'
+
+outputs:
+  pr_number:
+    description: 'The PR number created (empty if no changes)'
+    value: ${{ steps.create-pr.outputs.pr_number }}
 
 runs:
   using: "composite"
@@ -35,40 +44,67 @@ runs:
       # Verify the change
       cat "$FILE_PATH"
 
-  - name: Commit and Push changes
+  - name: Create PR
+    id: create-pr
     shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
     run: |
       git config --global user.name "github-actions[bot]"
       git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       FILE_PATH="helm/apps/${{ inputs.app_name }}/values/appversion-${{ inputs.environment }}.values.yaml"
+      git add "$FILE_PATH"
+
+      if git diff --staged --quiet; then
+        echo "No changes to commit."
+        echo "pr_number=" >> "$GITHUB_OUTPUT"
+        exit 0
+      fi
+
+      BRANCH_NAME="update-version/${{ inputs.app_name }}-${{ inputs.environment }}-${{ inputs.version }}"
+      PR_TITLE="chore(${{ inputs.app_name }}): update ${{ inputs.environment }} to ${{ inputs.version }}"
+      PR_BODY="Updating version \`${{ inputs.version }}\` for \`${{ inputs.app_name }}\` in \`${{ inputs.environment }}\`."
+
+      git fetch origin
+
+      # Check if an open PR already exists for this branch
+      EXISTING_PR=$(gh pr list --head "$BRANCH_NAME" --base "${{ inputs.base_branch }}" --json number --jq '.[0].number') || EXISTING_PR=""
+
+      if [[ -n "$EXISTING_PR" ]]; then
+        echo "Found existing open PR #$EXISTING_PR. Updating."
+        git checkout -B "$BRANCH_NAME" "origin/$BRANCH_NAME"
+      else
+        echo "Creating new branch from ${{ inputs.base_branch }}."
+        git checkout -B "$BRANCH_NAME" "${{ inputs.base_branch }}"
+      fi
 
       git add "$FILE_PATH"
 
-      # Check if there are changes to commit
       if git diff --staged --quiet; then
-        echo "No changes to commit."
+        echo "No changes after checkout. Skipping."
+        echo "pr_number=" >> "$GITHUB_OUTPUT"
+        exit 0
+      fi
+
+      git commit -m "$PR_TITLE"
+      git push -f origin "$BRANCH_NAME"
+
+      # Ensure label exists
+      gh label create "app:${{ inputs.app_name }}" --force 2>/dev/null || true
+
+      if [[ -n "$EXISTING_PR" ]]; then
+        echo "Updating PR #$EXISTING_PR..."
+        gh pr edit "$EXISTING_PR" --title "$PR_TITLE" --body "$PR_BODY" --add-label "app:${{ inputs.app_name }}"
+        echo "pr_number=$EXISTING_PR" >> "$GITHUB_OUTPUT"
       else
-        git commit -m "chore: update ${{ inputs.app_name }} version to ${{ inputs.version }} for ${{ inputs.environment }}"
-        
-        MAX_RETRIES=10
-        count=0
-        success=false
-
-        while [ $count -lt $MAX_RETRIES ]; do
-          git pull --rebase origin main
-          if git push origin HEAD:main; then
-            success=true
-            break
-          else
-            echo "Push failed, retrying in 5 seconds..."
-            sleep 5
-            count=$((count + 1))
-          fi
-        done
-
-        if [ "$success" = false ]; then
-          echo "Failed to push changes after $MAX_RETRIES attempts."
-          exit 1
-        fi
+        echo "Creating new PR..."
+        PR_URL=$(gh pr create \
+          --title "$PR_TITLE" \
+          --body "$PR_BODY" \
+          --label "app:${{ inputs.app_name }}" \
+          --head "$BRANCH_NAME" \
+          --base "${{ inputs.base_branch }}")
+        PR_NUM=$(echo "$PR_URL" | grep -o '[0-9]*$')
+        echo "pr_number=$PR_NUM" >> "$GITHUB_OUTPUT"
       fi
