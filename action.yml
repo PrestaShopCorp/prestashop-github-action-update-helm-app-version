@@ -76,7 +76,7 @@ runs:
         git checkout -B "$BRANCH_NAME" "origin/$BRANCH_NAME"
       else
         echo "Creating new branch from ${{ inputs.base_branch }}."
-        git checkout -B "$BRANCH_NAME" "${{ inputs.base_branch }}"
+        git checkout -B "$BRANCH_NAME" "origin/${{ inputs.base_branch }}"
       fi
 
       git add "$FILE_PATH"
